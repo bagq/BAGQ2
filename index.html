@@ -6,22 +6,103 @@
     <title>BAG-Q</title>
 
     <style>
-        #map { height: 100vh; width: 100%; }
 
-        /* Search box styling */
+        #mainHeader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #f2f2f2;  /* light gray */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 25px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            z-index: 2000;
+        }
+
+        #mainHeader .right-section button,
+        #mainHeader .right-section a {
+            margin-left: 30px;
+        }
+
+        #mainHeader .left-section {
+            margin-left: 30px;
+        }
+
+        #mainHeader .right-section {
+            margin-right: 30px;
+        }
+
+        #mainHeader .right-section a,
+        #mainHeader .right-section button {
+            margin-left: 20px;
+        }
+
+        #jeepSidebar {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: -340px;
+            width: 280px;
+            max-height: 75vh;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            z-index: 1500;
+            transition: left 0.4s ease;
+        }
+
+        #jeepSidebar.show {
+            left: 20px;
+        }
+
+        #jeepList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        #map {
+            height: calc(100vh - 60px);
+            margin-top: 60px;
+        }
+
         #searchContainer {
             position: absolute;
-            top: 20px;
+            top: 70px;
             left: 60px;
-            z-index: 1200;
+            z-index: 2100;
             width: 280px;
         }
 
-        /* Sidebar styling */
+        .jeep-card {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .jeep-card img {
+            width: 40px;
+            height: 40px;
+            margin-right: 12px;
+        }
+
+        .jeep-info {
+            font-size: 14px;
+        }
+
         #accountSidebar {
             position: fixed;
             top: 0;
-            right: -400px; /* Hidden by default */
+            right: -400px;
             width: 300px;
             height: 100vh;
             background-color: #f8f9fa;
@@ -52,16 +133,21 @@
         <ul class="list-group mt-1" id="suggestions"></ul>
     </div>
 
+    <!-- HEADER -->
+    <div id="mainHeader">
+        <div class="left-section">
+            <strong>BAG-Q</strong>
+        </div>
+
+        <div class="right-section">
+            <a href="driver.html" class="btn btn-outline-dark btn-sm">Driver</a>
+            <a href="login.html" class="btn btn-outline-dark btn-sm">Login</a>
+            <a href="register.html" class="btn btn-outline-dark btn-sm">Register</a>
+        </div>
+    </div>
+
     <!-- MAP -->
     <div id="map"></div>
-
-    <!-- LOGIN BUTTON (now links to separate page) -->
-    <a href="login.html" class="btn btn-primary position-absolute"
-       style="top: 20px; right: 130px; z-index: 1000;">🔐 Login</a>
-
-    <!-- REGISTER BUTTON (now links to separate page) -->
-    <a href="register.html" class="btn btn-success position-absolute"
-       style="top: 20px; right: 20px; z-index: 1000;">📝 Register</a>
 
     <!-- ACCOUNT SIDEBAR -->
     <div id="accountSidebar">
@@ -81,7 +167,32 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
+    <div id="jeepSidebar">
+        <h5 id="terminalTitle">Available Jeepneys</h5>
+        <ul id="jeepList"></ul>
+    </div>
+
     <script>
+        // --- ICONS ---
+        const terminalIcon = L.icon({
+            iconUrl: 'terminal.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        const jeepneyIcon = L.icon({
+            iconUrl: 'jeepney.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+
+        const userIcon = L.icon({
+            iconUrl: 'user.png',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
         // --- 1. SAMPLE TERMINALS STORED IN SYSTEM ---
         const terminals = [
             { name: "Irisan Terminal", lat: 16.4321, lng: 120.5751 },
@@ -96,7 +207,17 @@
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: "© OpenStreetMap contributors"
         }).addTo(map);
-        const marker = L.marker([0, 0]).addTo(map);
+        const marker = L.marker([0, 0], { icon: userIcon }).addTo(map);
+
+        terminals.forEach(t => {
+            const terminalMarker = L.marker([t.lat, t.lng], { icon: terminalIcon })
+                .addTo(map)
+                .bindPopup(`<strong>${t.name}</strong>`);
+
+            terminalMarker.on("click", () => {
+                showJeepSidebar(t.name);
+            });
+            });
 
         // Auto-locate user
         // Auto-locate user and update every 30 seconds
@@ -186,6 +307,51 @@
         }
 
         document.getElementById("logoutBtn").addEventListener("click", hideAccountSidebar);
+
+        let jeepMarker = L.marker([16.4025, 120.5965], {
+            icon: jeepneyIcon
+        }).addTo(map).bindPopup("Jeepney #12");
+
+        function showJeepSidebar(terminalName) {
+
+            document.getElementById("terminalTitle").textContent = "Jeepneys at " + terminalName;
+
+            const jeepList = document.getElementById("jeepList");
+            jeepList.innerHTML = "";
+
+            const now = new Date();
+            const jeepTimes = [5, 10, 15, 20];
+
+            jeepTimes.forEach((mins, index) => {
+
+                const etaTime = new Date(now.getTime() + mins * 60000);
+
+                const formattedTime = etaTime.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+                });
+
+                const li = document.createElement("li");
+
+                li.innerHTML = `
+                <div class="jeep-card">
+                    <img src="jeepney.png" alt="Jeepney">
+                    <div class="jeep-info">
+                    <strong>Jeep #${index + 1}</strong><br>
+                    ETA: ${formattedTime}
+                    </div>
+                </div>
+                `;
+
+                jeepList.appendChild(li);
+            });
+
+            document.getElementById("jeepSidebar").classList.add("show");
+        }
+        
+        map.on("click", () => {
+            document.getElementById("jeepSidebar").classList.remove("show");
+        });
     </script>
 </body>
 </html>
